@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ScrollTrap</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Instrument+Sans:wght@400;500;600&family=Syne+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --feed-bg:#080808;--feed-surface:#111;--feed-text:#f0f0f0;--feed-muted:#666;
+  --feed-accent:#fe2c55;--feed-accent2:#25f4ee;--feed-border:#1c1c1c;
+  --ed-bg:#f4f0e8;--ed-surface:#fff;--ed-text:#1a1a1a;--ed-muted:#888;
+  --ed-accent:#1a4a3a;--ed-accent-light:#e8f0ec;--ed-red:#c0392b;--ed-border:#e0dbd0;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{font-family:'Instrument Sans',sans-serif;background:var(--feed-bg);color:var(--feed-text);min-height:100vh;overflow-x:hidden;transition:background 0.4s,color 0.4s;}
+body.editorial{background:var(--ed-bg);color:var(--ed-text);}
+.screen{display:none;min-height:100vh;flex-direction:column;align-items:center;}
+.screen.active{display:flex;}
+
+/* INTRO */
+#s-intro{justify-content:center;padding:48px 28px;position:relative;overflow:hidden;background:var(--feed-bg);}
+#s-intro::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,0.012) 2px,rgba(255,255,255,0.012) 4px);pointer-events:none;z-index:0;}
+.intro-glow{position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(254,44,85,0.15) 0%,transparent 70%);top:-120px;left:50%;transform:translateX(-50%);pointer-events:none;}
+.intro-inner{position:relative;z-index:1;max-width:480px;width:100%;display:flex;flex-direction:column;align-items:flex-start;}
+.intro-tag{font-family:'Syne Mono',monospace;font-size:10px;letter-spacing:0.18em;color:var(--feed-accent2);text-transform:uppercase;margin-bottom:28px;opacity:0;animation:riseIn 0.7s 0.1s forwards;}
+.intro-headline{font-family:'Playfair Display',serif;font-size:clamp(56px,14vw,104px);font-weight:900;line-height:0.88;letter-spacing:-0.03em;margin-bottom:32px;color:var(--feed-text);opacity:0;animation:riseIn 0.7s 0.25s forwards;}
+.intro-headline em{font-style:italic;color:var(--feed-accent);}
+.intro-deck{font-size:15px;line-height:1.65;color:#999;max-width:380px;margin-bottom:40px;opacity:0;animation:riseIn 0.7s 0.4s forwards;}
+.intro-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;width:100%;background:#1e1e1e;border:1px solid #1e1e1e;border-radius:10px;overflow:hidden;margin-bottom:36px;opacity:0;animation:riseIn 0.7s 0.55s forwards;}
+.stat-cell{background:var(--feed-surface);padding:18px 16px;display:flex;flex-direction:column;gap:4px;}
+.stat-n{font-family:'Playfair Display',serif;font-size:30px;font-weight:900;color:var(--feed-accent);line-height:1;}
+.stat-l{font-size:10px;color:var(--feed-muted);letter-spacing:0.06em;text-transform:uppercase;line-height:1.3;}
+.intro-cta{display:flex;align-items:center;gap:16px;opacity:0;animation:riseIn 0.7s 0.7s forwards;width:100%;}
+.btn-start{background:var(--feed-accent);color:#fff;border:none;padding:16px 36px;font-family:'Instrument Sans',sans-serif;font-size:14px;font-weight:600;letter-spacing:0.04em;cursor:pointer;border-radius:100px;transition:transform 0.2s,box-shadow 0.2s;flex-shrink:0;}
+.btn-start:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(254,44,85,0.35);}
+.intro-hint{font-size:12px;color:var(--feed-muted);line-height:1.5;flex:1;}
+
+/* SURVEY */
+#s-survey{background:var(--feed-bg);overflow-y:auto;justify-content:center;}
+.survey-inner{width:100%;max-width:480px;padding:48px 24px 60px;display:flex;flex-direction:column;}
+.survey-kicker{font-family:'Syne Mono',monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--feed-accent2);margin-bottom:14px;}
+.survey-title{font-family:'Playfair Display',serif;font-size:clamp(32px,8vw,52px);font-weight:900;line-height:1;letter-spacing:-0.03em;color:var(--feed-text);margin-bottom:10px;}
+.survey-sub{font-size:13px;color:var(--feed-muted);margin-bottom:36px;line-height:1.5;}
+.survey-q{margin-bottom:28px;}
+.survey-q-label{display:flex;align-items:flex-start;gap:10px;font-size:14px;font-weight:600;color:var(--feed-text);line-height:1.4;margin-bottom:12px;}
+.sq-num{font-family:'Syne Mono',monospace;font-size:10px;font-weight:700;color:var(--feed-accent);background:rgba(254,44,85,0.1);border:1px solid rgba(254,44,85,0.2);padding:3px 7px;border-radius:4px;flex-shrink:0;margin-top:1px;letter-spacing:0.05em;}
+.survey-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.survey-opt{background:#111;border:1.5px solid #222;color:#aaa;font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:500;padding:11px 12px;border-radius:8px;cursor:pointer;text-align:left;transition:border-color 0.2s,color 0.2s,background 0.2s;line-height:1.3;}
+.survey-opt:hover{border-color:#444;color:#ddd;}
+.survey-opt.selected{background:rgba(254,44,85,0.1);border-color:var(--feed-accent);color:var(--feed-text);font-weight:600;}
+.survey-submit{margin-top:8px;width:100%;opacity:0.35;transition:opacity 0.3s,transform 0.2s,box-shadow 0.2s;border-radius:100px;}
+.survey-submit:not([disabled]){opacity:1;}
+.survey-submit[disabled]{cursor:not-allowed;}
+
+/* FEED */
+#s-feed{background:var(--feed-bg);position:relative;max-height:100vh;overflow:hidden;}
+.feed-chrome{width:100%;max-width:430px;display:flex;flex-direction:column;height:100vh;}
+.feed-status{display:flex;justify-content:space-between;align-items:center;padding:10px 18px 6px;flex-shrink:0;}
+.feed-logo{font-family:'Syne Mono',monospace;font-size:15px;color:var(--feed-text);letter-spacing:0.05em;}
+.feed-progress{display:flex;align-items:center;gap:5px;}
+.prog-pip{width:20px;height:3px;border-radius:2px;background:#222;transition:background 0.3s,width 0.3s;}
+.prog-pip.done{background:var(--feed-muted);}
+.prog-pip.liked{background:var(--feed-accent);width:28px;}
+.prog-pip.current{background:var(--feed-text);}
+.card-viewport{flex:1;position:relative;overflow:hidden;}
+.feed-card{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity 0.3s ease,transform 0.3s ease;transform:translateY(30px);}
+.feed-card.active{opacity:1;pointer-events:all;transform:translateY(0);}
+.feed-card.exiting{opacity:0;transform:translateY(-40px) scale(0.97);}
+.feed-card.entering{animation:cardEnter 0.32s cubic-bezier(0.22,1,0.36,1) forwards;}
+@keyframes cardEnter{from{opacity:0;transform:translateY(50px) scale(0.98);}to{opacity:1;transform:translateY(0) scale(1);}}
+.card-vis{flex:1;position:relative;min-height:0;}
+.card-vis-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
+.card-vis-emoji{font-size:100px;opacity:0.12;user-select:none;}
+.card-gradient{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.3) 45%,rgba(0,0,0,0.05) 100%);}
+.card-sidebar{position:absolute;right:12px;bottom:80px;display:flex;flex-direction:column;gap:22px;align-items:center;}
+.sidebar-action{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:none;cursor:pointer;color:#fff;}
+.sidebar-icon{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:20px;transition:transform 0.2s,background 0.2s;backdrop-filter:blur(8px);}
+.sidebar-action:hover .sidebar-icon{background:rgba(255,255,255,0.18);}
+.sidebar-action.heart-action.is-liked .sidebar-icon{background:rgba(254,44,85,0.3);animation:heartpop 0.3s ease;}
+.sidebar-label{font-size:10px;color:rgba(255,255,255,0.7);font-weight:500;}
+@keyframes heartpop{0%{transform:scale(1);}50%{transform:scale(1.35);}100%{transform:scale(1);}}
+.card-info{position:absolute;bottom:0;left:0;right:60px;padding:16px 14px 18px;}
+.card-author-row{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
+.author-avi{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0;border:1.5px solid rgba(255,255,255,0.2);}
+.author-name{font-size:13px;font-weight:600;color:#fff;}
+.author-handle{font-size:11px;color:rgba(255,255,255,0.55);}
+.follow-pill{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,0.4);color:#fff;font-size:11px;font-weight:600;font-family:'Instrument Sans',sans-serif;padding:3px 11px;border-radius:4px;cursor:pointer;flex-shrink:0;}
+.card-caption{font-size:13px;line-height:1.55;color:rgba(255,255,255,0.9);margin-bottom:8px;}
+.card-hashtags{font-size:12px;color:rgba(255,255,255,0.55);margin-bottom:8px;}
+.card-cta-strip{display:inline-flex;align-items:center;gap:6px;background:var(--feed-accent);color:#fff;font-size:11px;font-weight:600;letter-spacing:0.04em;padding:6px 12px;border-radius:6px;margin-top:4px;cursor:pointer;}
+.card-comments-strip{background:rgba(0,0,0,0.6);backdrop-filter:blur(12px);border-top:1px solid rgba(255,255,255,0.06);padding:8px 14px;flex-shrink:0;}
+.comment-line{font-size:11.5px;color:rgba(255,255,255,0.6);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.comment-name{color:rgba(255,255,255,0.85);font-weight:600;}
+.feed-nav{display:flex;justify-content:space-around;align-items:center;padding:10px 0 18px;background:rgba(8,8,8,0.95);backdrop-filter:blur(16px);border-top:1px solid var(--feed-border);flex-shrink:0;}
+.nav-tab{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;letter-spacing:0.06em;text-transform:uppercase;color:var(--feed-muted);padding:4px 12px;}
+.nav-tab.active{color:var(--feed-text);}
+.nav-tab-icon{font-size:22px;}
+.feed-instruct{position:absolute;top:48px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:100px;padding:7px 18px;font-size:11px;color:rgba(255,255,255,0.75);font-weight:500;white-space:nowrap;pointer-events:none;z-index:10;transition:opacity 0.5s;}
+.feed-instruct.hide{opacity:0;}
+
+/* SHOP MODAL */
+.shop-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.3s;}
+.shop-overlay.open{opacity:1;pointer-events:all;}
+.shop-sheet{width:100%;max-width:430px;background:#fff;border-radius:20px 20px 0 0;max-height:88vh;overflow-y:auto;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.4,0,0.2,1);}
+.shop-overlay.open .shop-sheet{transform:translateY(0);}
+.shop-handle{width:36px;height:4px;border-radius:2px;background:#ddd;margin:12px auto 0;}
+.shop-hero{padding:16px 18px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #f0f0f0;}
+.shop-thumb{width:72px;height:72px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;}
+.shop-product-name{font-size:15px;font-weight:700;color:#111;margin-bottom:3px;line-height:1.3;}
+.shop-seller{font-size:11px;color:#999;margin-bottom:6px;}
+.shop-stars{font-size:12px;color:#f59e0b;}
+.shop-rev-count{font-size:11px;color:#999;margin-left:4px;}
+.shop-price-row{padding:14px 18px;display:flex;align-items:baseline;gap:10px;border-bottom:1px solid #f5f5f5;flex-wrap:wrap;}
+.shop-price-now{font-family:'Playfair Display',serif;font-size:28px;font-weight:900;color:#c0392b;}
+.shop-price-was{font-size:14px;color:#bbb;text-decoration:line-through;}
+.shop-price-save{font-size:11px;font-weight:700;color:#fff;background:#c0392b;padding:2px 8px;border-radius:4px;}
+.shop-price-anchor-row{display:flex;align-items:center;gap:6px;margin-top:4px;width:100%;}
+.shop-price-anchor-row span{font-size:11px;color:#bbb;text-decoration:line-through;}
+.shop-price-anchor-label{font-size:10px;color:#e67e22;font-weight:600;background:#fef9f0;padding:1px 6px;border-radius:3px;text-decoration:none !important;}
+.shop-urgency{margin:14px 18px 0;background:#fff8f8;border:1px solid #fdd;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;}
+.shop-urgency-icon{font-size:18px;flex-shrink:0;}
+.shop-urgency-text{font-size:12px;color:#c0392b;line-height:1.4;}
+.shop-countdown{font-family:'Syne Mono',monospace;font-size:18px;font-weight:700;color:#c0392b;letter-spacing:0.05em;}
+.shop-countdown.reset-flash{animation:flashRed 0.5s ease;}
+@keyframes flashRed{0%{color:#c0392b;}50%{color:#fff;background:#c0392b;padding:0 4px;border-radius:3px;}100%{color:#c0392b;}}
+.shop-stock{margin:10px 18px 0;display:flex;align-items:center;gap:8px;}
+.shop-stock-bar{flex:1;height:5px;background:#eee;border-radius:3px;overflow:hidden;}
+.shop-stock-fill{height:100%;background:#f59e0b;border-radius:3px;width:18%;}
+.shop-stock-label{font-size:11px;color:#f59e0b;font-weight:600;white-space:nowrap;}
+/* Email capture (card 1) */
+.shop-email-capture{margin:12px 18px 0;background:#f0f7ff;border:1px solid #bee3f8;border-radius:10px;padding:14px;}
+.shop-email-label{font-size:12px;font-weight:700;color:#1a5276;margin-bottom:6px;}
+.shop-email-sub{font-size:10px;color:#7f8c8d;margin-bottom:10px;line-height:1.4;}
+.shop-email-row{display:flex;gap:6px;}
+.shop-email-input{flex:1;border:1px solid #bee3f8;border-radius:6px;padding:8px 10px;font-size:12px;color:#333;outline:none;background:#fff;}
+.shop-email-btn{background:#2980b9;color:#fff;border:none;padding:8px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.shop-email-fine-print{font-size:9px;color:#aaa;margin-top:6px;line-height:1.5;}
+/* Purchase ticker (card 4) */
+.shop-ticker{margin:10px 18px 0;overflow:hidden;height:24px;position:relative;}
+.shop-ticker-inner{display:flex;flex-direction:column;animation:tickerScroll 4s linear infinite;}
+.shop-ticker-item{font-size:11px;color:#27ae60;font-weight:500;height:24px;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+.shop-ticker-item::before{content:'●';font-size:8px;color:#27ae60;}
+@keyframes tickerScroll{0%{transform:translateY(0);}25%{transform:translateY(-24px);}50%{transform:translateY(-48px);}75%{transform:translateY(-72px);}100%{transform:translateY(0);}}
+/* Pre-checked subscription (card 6) */
+.shop-subscribe-row{display:flex;align-items:flex-start;gap:8px;margin:10px 18px 0;padding:10px;background:#f9f9f9;border-radius:8px;border:1px solid #eee;}
+.shop-subscribe-check{width:16px;height:16px;accent-color:#27ae60;flex-shrink:0;margin-top:1px;}
+.shop-subscribe-text{font-size:11px;color:#555;line-height:1.4;}
+.shop-subscribe-text strong{color:#c0392b;}
+/* Anchor price strikethrough stack (card 6) */
+.shop-anchor-stack{padding:4px 18px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.shop-anchor-item{font-size:12px;color:#ccc;text-decoration:line-through;}
+.shop-anchor-arrow{font-size:10px;color:#999;}
+/* Reviews with fake/real labels */
+.shop-reviews-section{padding:14px 18px 0;}
+.shop-reviews-title{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#999;margin-bottom:10px;}
+.shop-review-item{background:#f9f9f9;border-radius:8px;padding:10px 12px;margin-bottom:8px;position:relative;}
+.shop-review-item.fake-review{border-left:3px solid #e74c3c;}
+.shop-review-item.real-review{border-left:3px solid #27ae60;}
+.shop-review-top{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.shop-review-avi{width:24px;height:24px;border-radius:50%;background:#e0e0e0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#888;}
+.shop-review-name{font-size:12px;font-weight:600;color:#333;}
+.shop-review-stars{font-size:10px;color:#f59e0b;margin-left:auto;}
+.shop-review-verified{font-size:9px;color:#2e7d32;font-weight:600;background:#e8f5e9;padding:1px 6px;border-radius:3px;}
+.shop-review-text{font-size:12px;color:#555;line-height:1.5;}
+.shop-review-tag{position:absolute;top:8px;right:10px;font-size:9px;font-weight:700;letter-spacing:0.06em;padding:2px 7px;border-radius:4px;display:none;}
+.shop-review-tag.fake{background:rgba(231,76,60,0.12);color:#e74c3c;border:1px solid rgba(231,76,60,0.2);}
+.shop-review-tag.real{background:rgba(39,174,96,0.12);color:#27ae60;border:1px solid rgba(39,174,96,0.2);}
+.shop-review-tag.show{display:block;}
+/* CTA area */
+.shop-cta-area{padding:16px 18px 24px;position:sticky;bottom:0;background:#fff;border-top:1px solid #f0f0f0;}
+.shop-add-btn{width:100%;padding:16px;border:none;border-radius:12px;font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:700;letter-spacing:0.03em;cursor:pointer;background:#fe2c55;color:#fff;transition:transform 0.15s,box-shadow 0.15s;}
+.shop-add-btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(254,44,85,0.3);}
+/* Exit intent overlay (card 8) */
+.shop-exit-overlay{display:none;position:absolute;inset:0;background:rgba(0,0,0,0.75);z-index:10;align-items:center;justify-content:center;border-radius:20px 20px 0 0;}
+.shop-exit-overlay.show{display:flex;}
+.shop-exit-box{background:#fff;border-radius:16px;padding:28px 24px;max-width:320px;text-align:center;margin:0 16px;}
+.shop-exit-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:900;color:#111;margin-bottom:8px;line-height:1.2;}
+.shop-exit-sub{font-size:13px;color:#666;margin-bottom:20px;line-height:1.5;}
+.shop-exit-yes{width:100%;padding:14px;background:#fe2c55;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;}
+.shop-exit-no{width:100%;padding:10px;background:none;border:none;color:#bbb;font-size:11px;cursor:pointer;line-height:1.4;}
+/* Reveal banner */
+.shop-reveal-banner{display:none;background:#1a1a1a;color:#f4f0e8;padding:20px 18px;border-radius:12px;margin-bottom:12px;}
+.shop-reveal-banner.show{display:block;}
+.shop-reveal-eyebrow{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:#fe2c55;margin-bottom:8px;}
+.shop-reveal-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;color:#f4f0e8;margin-bottom:8px;line-height:1.3;}
+.shop-reveal-body{font-size:12px;line-height:1.7;color:#aaa;}
+.shop-reveal-body mark{background:rgba(245,200,66,0.25);color:#f4f0e8;padding:0 2px;border-radius:2px;}
+.shop-close{display:block;width:100%;margin-top:12px;padding:12px;background:transparent;border:1.5px solid #333;border-radius:10px;color:#f4f0e8;font-family:'Instrument Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;text-align:center;}
+.shop-close:hover{border-color:#fe2c55;color:#fe2c55;}
+
+/* REVEAL */
+#s-reveal{background:var(--ed-bg);padding:0;min-height:100vh;}
+.reveal-masthead{width:100%;background:var(--ed-surface);border-bottom:2px solid var(--ed-text);padding:28px 28px 20px;}
+.masthead-top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;}
+.masthead-pub{font-family:'Playfair Display',serif;font-size:13px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--ed-text);}
+.masthead-date{font-family:'Syne Mono',monospace;font-size:10px;color:var(--ed-muted);letter-spacing:0.08em;}
+.masthead-rule{height:1px;background:#ccc;margin-bottom:20px;}
+.masthead-headline{font-family:'Playfair Display',serif;font-size:clamp(26px,5vw,40px);font-weight:900;line-height:1.1;letter-spacing:-0.02em;color:var(--ed-text);margin-bottom:10px;}
+.masthead-sub{font-size:14px;line-height:1.6;color:var(--ed-muted);max-width:560px;}
+.score-band{width:100%;background:var(--ed-text);color:var(--ed-bg);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.score-item{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.score-big{font-family:'Playfair Display',serif;font-size:32px;font-weight:900;line-height:1;}
+.score-big.red{color:var(--feed-accent);}
+.score-big.cyan{color:var(--feed-accent2);}
+.score-big.yellow{color:#f5c842;}
+.score-small{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(244,240,232,0.5);}
+.time-band{width:100%;background:var(--ed-accent);color:#e8f0ec;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.time-band-label{font-family:'Syne Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.7;}
+.time-band-value{font-family:'Playfair Display',serif;font-size:22px;font-weight:900;line-height:1;}
+.time-band-compare{font-size:12px;opacity:0.75;line-height:1.4;max-width:260px;text-align:right;}
+.reveal-body{padding:24px 20px 32px;display:flex;flex-direction:column;gap:16px;max-width:640px;width:100%;margin:0 auto;}
+.article-card{background:var(--ed-surface);border:1px solid var(--ed-border);border-radius:10px;overflow:hidden;opacity:0;animation:slideUp 0.45s ease forwards;}
+.article-card:nth-child(1){animation-delay:0.05s;}.article-card:nth-child(2){animation-delay:0.12s;}.article-card:nth-child(3){animation-delay:0.19s;}.article-card:nth-child(4){animation-delay:0.26s;}.article-card:nth-child(5){animation-delay:0.33s;}.article-card:nth-child(6){animation-delay:0.40s;}.article-card:nth-child(7){animation-delay:0.47s;}.article-card:nth-child(8){animation-delay:0.54s;}
+@keyframes slideUp{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+.article-header{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--ed-border);}
+.article-thumb{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.article-meta{flex:1;min-width:0;}
+.article-title{font-size:13px;font-weight:600;color:var(--ed-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.article-byline{font-size:11px;color:var(--ed-muted);margin-top:1px;}
+.article-badges{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
+.verdict-badge{font-family:'Syne Mono',monospace;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;}
+.verdict-badge.ad{background:rgba(192,57,43,0.1);color:var(--ed-red);border:1px solid rgba(192,57,43,0.2);}
+.verdict-badge.organic{background:rgba(26,74,58,0.1);color:var(--ed-accent);border:1px solid rgba(26,74,58,0.2);}
+.liked-flag{font-size:10px;color:var(--feed-accent);font-weight:600;}
+.article-body{padding:14px 16px 16px;}
+.tactic-eyebrow{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ed-red);margin-bottom:4px;}
+.tactic-title{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--ed-text);margin-bottom:8px;}
+.tactic-body{font-size:13px;line-height:1.7;color:#555;}
+.tactic-body mark{background:rgba(245,200,66,0.3);color:inherit;padding:0 2px;border-radius:2px;}
+.organic-note{font-size:13px;line-height:1.7;color:var(--ed-muted);font-style:italic;}
+.dwell-badge{display:inline-flex;align-items:center;gap:5px;font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:0.08em;padding:3px 8px;border-radius:4px;margin-top:6px;background:rgba(37,244,238,0.08);color:#25f4ee;border:1px solid rgba(37,244,238,0.2);}
+.dwell-badge.high{background:rgba(254,44,85,0.1);color:#fe2c55;border-color:rgba(254,44,85,0.25);}
+.dwell-note{font-size:12px;color:#777;margin-top:6px;line-height:1.5;font-style:italic;}
+.reveal-cta-wrap{padding:0 20px 40px;max-width:640px;width:100%;margin:0 auto;}
+
+/* REFLECT */
+#s-reflect{background:var(--ed-bg);padding:0;}
+.reflect-inner{width:100%;max-width:600px;padding:40px 24px 60px;}
+.reflect-kicker{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ed-accent);margin-bottom:12px;}
+.reflect-title{font-family:'Playfair Display',serif;font-size:clamp(30px,6vw,46px);font-weight:900;line-height:1.05;letter-spacing:-0.02em;color:var(--ed-text);margin-bottom:8px;}
+.reflect-dek{font-size:14px;line-height:1.65;color:var(--ed-muted);max-width:480px;margin-bottom:36px;border-left:3px solid var(--ed-accent);padding-left:14px;}
+.reflect-q-block{margin-bottom:28px;}
+.reflect-q-num{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ed-red);margin-bottom:6px;}
+.reflect-q-text{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--ed-text);line-height:1.4;margin-bottom:10px;}
+.reflect-q-hint{font-size:12px;color:var(--ed-muted);margin-bottom:10px;line-height:1.5;}
+.reflect-textarea{width:100%;background:var(--ed-surface);border:1.5px solid var(--ed-border);border-radius:8px;color:var(--ed-text);font-family:'Instrument Sans',sans-serif;font-size:13px;line-height:1.65;padding:14px 16px;resize:vertical;min-height:90px;outline:none;transition:border-color 0.2s;}
+.reflect-textarea:focus{border-color:var(--ed-accent);}
+.reflect-textarea::placeholder{color:#bbb;}
+.reflect-divider{height:1px;background:var(--ed-border);margin:32px 0;}
+
+/* RESULT */
+#s-result{background:var(--ed-bg);padding:0;justify-content:flex-start;}
+.result-inner{width:100%;max-width:600px;padding:40px 24px 60px;}
+.result-flag{display:inline-block;background:var(--ed-text);color:var(--ed-bg);font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:0.16em;text-transform:uppercase;padding:5px 12px;border-radius:4px;margin-bottom:20px;}
+.result-headline{font-family:'Playfair Display',serif;font-size:clamp(40px,10vw,72px);font-weight:900;line-height:0.9;letter-spacing:-0.03em;color:var(--ed-text);margin-bottom:12px;}
+.result-headline.green{color:var(--ed-accent);}
+.result-headline.amber{color:#b8860b;}
+.result-headline.red{color:var(--ed-red);}
+.result-subhead{font-size:15px;color:var(--ed-muted);line-height:1.6;max-width:460px;margin-bottom:32px;}
+.result-rule{height:2px;background:var(--ed-text);margin-bottom:24px;}
+.result-insights-label{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ed-muted);margin-bottom:16px;}
+.insight-row{display:flex;gap:14px;margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--ed-border);}
+.insight-row:last-child{border-bottom:none;}
+.insight-icon-wrap{width:36px;height:36px;border-radius:8px;background:var(--ed-accent-light);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.insight-text{font-size:13px;line-height:1.65;color:var(--ed-text);padding-top:2px;}
+.tactic-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px;}
+.tactic-chip{font-family:'Syne Mono',monospace;font-size:10px;letter-spacing:0.06em;padding:5px 12px;border:1px solid var(--ed-border);border-radius:100px;color:var(--ed-text);background:var(--ed-surface);}
+.tactic-chip.triggered{background:rgba(192,57,43,0.08);border-color:rgba(192,57,43,0.3);color:var(--ed-red);}
+.survey-reveal{background:var(--ed-surface);border:1px solid var(--ed-border);border-radius:12px;padding:20px;margin-bottom:24px;}
+.survey-reveal-title{font-family:'Syne Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ed-muted);margin-bottom:14px;}
+.survey-row{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--ed-border);}
+.survey-row:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+.survey-row-q{font-size:11px;color:var(--ed-muted);line-height:1.4;}
+.survey-row-a{font-size:13px;font-weight:600;color:var(--ed-text);}
+.survey-row-note{font-size:11px;color:var(--ed-red);margin-top:2px;font-style:italic;}
+.result-credit{margin-top:36px;padding-top:20px;border-top:1px solid var(--ed-border);font-family:'Syne Mono',monospace;font-size:10px;color:var(--ed-muted);letter-spacing:0.06em;line-height:1.8;}
+
+/* BUTTONS */
+.btn-ed-primary{background:var(--ed-text);color:var(--ed-bg);border:none;padding:16px 36px;font-family:'Instrument Sans',sans-serif;font-size:14px;font-weight:600;letter-spacing:0.04em;cursor:pointer;border-radius:8px;width:100%;transition:opacity 0.2s,transform 0.2s;display:block;text-align:center;}
+.btn-ed-primary:hover{opacity:0.85;transform:translateY(-1px);}
+.btn-ed-ghost{background:transparent;color:var(--ed-text);border:1.5px solid var(--ed-border);padding:14px 36px;font-family:'Instrument Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border-radius:8px;width:100%;margin-top:10px;transition:border-color 0.2s,color 0.2s;display:block;text-align:center;}
+.btn-ed-ghost:hover{border-color:var(--ed-accent);color:var(--ed-accent);}
+.btn-restart{background:var(--feed-accent);color:#fff;border:none;padding:16px 36px;font-family:'Instrument Sans',sans-serif;font-size:14px;font-weight:600;letter-spacing:0.04em;cursor:pointer;border-radius:8px;width:100%;transition:transform 0.2s,box-shadow 0.2s;display:block;text-align:center;margin-top:12px;}
+.btn-restart:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(254,44,85,0.3);}
+
+@keyframes riseIn{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- S1: INTRO -->
+<section id="s-intro" class="screen active">
+  <div class="intro-glow"></div>
+  <div class="intro-inner">
+    <p class="intro-tag">↯ A Media Literacy Experience · NYU LTXD</p>
+    <h1 class="intro-headline">Scroll<em>Trap</em></h1>
+    <p class="intro-deck">You scroll short-video feeds every day. But can you tell what's an ad — and what's content you just happen to want to buy? Eight videos. Five hidden tactics. Let's find out.</p>
+    <div class="intro-stats">
+      <div class="stat-cell"><span class="stat-n">73%</span><span class="stat-l">of users miss native ads</span></div>
+      <div class="stat-cell"><span class="stat-n">8</span><span class="stat-l">videos in your feed</span></div>
+      <div class="stat-cell"><span class="stat-n">5</span><span class="stat-l">persuasion tactics hidden inside</span></div>
+    </div>
+    <div class="intro-cta">
+      <button class="btn-start" onclick="goTo('s-survey')">Before We Start →</button>
+      <p class="intro-hint">3 quick questions,<br>then you scroll.</p>
+    </div>
+  </div>
+</section>
+
+<!-- S1.5: SURVEY -->
+<section id="s-survey" class="screen">
+  <div class="survey-inner">
+    <p class="survey-kicker">Before You Scroll</p>
+    <h2 class="survey-title">Be honest.<br>No wrong answers.</h2>
+    <p class="survey-sub">Your answers are recorded privately and revealed at the end.</p>
+    <div class="survey-q">
+      <p class="survey-q-label"><span class="sq-num">01</span>How much time do you spend on short-video apps daily?</p>
+      <div class="survey-options">
+        <button class="survey-opt" onclick="selectOpt(this,1,'Less than 30 min')">Less than 30 min</button>
+        <button class="survey-opt" onclick="selectOpt(this,1,'30–60 min')">30–60 min</button>
+        <button class="survey-opt" onclick="selectOpt(this,1,'1–2 hours')">1–2 hours</button>
+        <button class="survey-opt" onclick="selectOpt(this,1,'2+ hours')">2+ hours</button>
+      </div>
+    </div>
+    <div class="survey-q">
+      <p class="survey-q-label"><span class="sq-num">02</span>Have you bought something in the last month because of a short video?</p>
+      <div class="survey-options">
+        <button class="survey-opt" onclick="selectOpt(this,2,'Yes, multiple times')">Yes, multiple times</button>
+        <button class="survey-opt" onclick="selectOpt(this,2,'Yes, once')">Yes, once</button>
+        <button class="survey-opt" onclick="selectOpt(this,2,'Almost, but I did not')">Almost, but I didn't</button>
+        <button class="survey-opt" onclick="selectOpt(this,2,'No')">No</button>
+      </div>
+    </div>
+    <div class="survey-q">
+      <p class="survey-q-label"><span class="sq-num">03</span>How confident are you that you can spot a hidden ad while scrolling?</p>
+      <div class="survey-options">
+        <button class="survey-opt" onclick="selectOpt(this,3,'Very confident')">Very confident</button>
+        <button class="survey-opt" onclick="selectOpt(this,3,'Somewhat confident')">Somewhat confident</button>
+        <button class="survey-opt" onclick="selectOpt(this,3,'Not very confident')">Not very confident</button>
+        <button class="survey-opt" onclick="selectOpt(this,3,'Not confident at all')">Not confident at all</button>
+      </div>
+    </div>
+    <button class="btn-start survey-submit" id="survey-submit" onclick="submitSurvey()" disabled>Start Scrolling →</button>
+  </div>
+</section>
+
+<!-- SHOP MODAL -->
+<div class="shop-overlay" id="shop-overlay">
+  <div class="shop-sheet" id="shop-sheet-inner">
+    <!-- dynamically rendered per card -->
+  </div>
+</div>
+
+<!-- S2: FEED -->
+<section id="s-feed" class="screen">
+  <div class="feed-chrome">
+    <div class="feed-status">
+      <span class="feed-logo">ScrollTrap</span>
+      <div class="feed-progress" id="feed-pips"></div>
+    </div>
+    <div class="card-viewport" id="card-viewport">
+      <div class="feed-instruct" id="feed-instruct">❤️ like to buy &nbsp;·&nbsp; swipe up for next</div>
+    </div>
+    <div class="feed-nav">
+      <div class="nav-tab"><span class="nav-tab-icon">🏠</span><span>Home</span></div>
+      <div class="nav-tab active"><span class="nav-tab-icon">▶️</span><span>For You</span></div>
+      <div class="nav-tab"><span class="nav-tab-icon">➕</span><span>Create</span></div>
+      <div class="nav-tab"><span class="nav-tab-icon">💬</span><span>Inbox</span></div>
+      <div class="nav-tab"><span class="nav-tab-icon">👤</span><span>Me</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- S3: REVEAL -->
+<section id="s-reveal" class="screen" style="overflow-y:auto;">
+  <div class="reveal-masthead">
+    <div class="masthead-top">
+      <span class="masthead-pub">ScrollTrap · The Reveal</span>
+      <span class="masthead-date" id="reveal-date"></span>
+    </div>
+    <div class="masthead-rule"></div>
+    <h2 class="masthead-headline" id="reveal-headline">Here's what was really in your feed.</h2>
+    <p class="masthead-sub" id="reveal-sub"></p>
+  </div>
+  <div class="score-band">
+    <div class="score-item"><span class="score-big red" id="sc-liked">0</span><span class="score-small">videos liked</span></div>
+    <div class="score-item"><span class="score-big cyan" id="sc-ads">5</span><span class="score-small">hidden ads</span></div>
+    <div class="score-item"><span class="score-big yellow" id="sc-liked-ads">0</span><span class="score-small">ads you liked</span></div>
+    <div class="score-item"><span class="score-big" id="sc-organic" style="color:#aaa">3</span><span class="score-small">organic</span></div>
+  </div>
+  <div class="time-band">
+    <div>
+      <div class="time-band-label">Your total time in this feed</div>
+      <div class="time-band-value" id="sc-total-time">—</div>
+    </div>
+    <div class="time-band-compare" id="sc-time-compare"></div>
+  </div>
+  <div class="reveal-body" id="reveal-body"></div>
+  <div class="reveal-cta-wrap">
+    <button class="btn-ed-primary" onclick="goTo('s-reflect')">Continue to Reflection →</button>
+    <button class="btn-ed-ghost" onclick="goTo('s-feed')">← Back to Feed</button>
+  </div>
+</section>
+
+<!-- S4: REFLECT -->
+<section id="s-reflect" class="screen" style="overflow-y:auto;align-items:center;">
+  <div class="reflect-inner">
+    <p class="reflect-kicker">Phase 3 of 3 · Reflection</p>
+    <h2 class="reflect-title">Now step<br><em>outside</em> the feed.</h2>
+    <p class="reflect-dek">The feed is designed to keep you inside it. These three questions ask you to look at it from the outside — as a critical observer of your own experience.</p>
+    <div class="reflect-q-block">
+      <p class="reflect-q-num">Question 01</p>
+      <p class="reflect-q-text">When you felt the urge to like a video, what did that moment feel like? Were you aware it might be an ad?</p>
+      <p class="reflect-q-hint">Think about the feeling before the decision — not what you decided.</p>
+      <textarea class="reflect-textarea" id="r1" placeholder="Describe the feeling or thought in that moment…"></textarea>
+    </div>
+    <div class="reflect-divider"></div>
+    <div class="reflect-q-block">
+      <p class="reflect-q-num">Question 02</p>
+      <p class="reflect-q-text">Looking at the reveal, which persuasion tactic surprised you most — and why did it work (or not) on you?</p>
+      <p class="reflect-q-hint">Reference the specific technique by name if you can.</p>
+      <textarea class="reflect-textarea" id="r2" placeholder="Name the tactic, then explain your reaction to it…"></textarea>
+    </div>
+    <div class="reflect-divider"></div>
+    <div class="reflect-q-block">
+      <p class="reflect-q-num">Question 03</p>
+      <p class="reflect-q-text">Name one specific signal you will watch for the next time you scroll your real For You page.</p>
+      <p class="reflect-q-hint">Be concrete — a word, a pattern, a visual cue.</p>
+      <textarea class="reflect-textarea" id="r3" placeholder="e.g. When a creator says 'honestly' or 'genuinely'…"></textarea>
+    </div>
+    <div style="margin-top:32px;">
+      <button class="btn-ed-primary" onclick="buildResult()">See My Results →</button>
+      <button class="btn-ed-ghost" onclick="goTo('s-reveal')">← Back to Reveal</button>
+    </div>
+  </div>
+</section>
+
+<!-- S5: RESULT -->
+<section id="s-result" class="screen" style="overflow-y:auto;align-items:center;">
+  <div class="result-inner">
+    <span class="result-flag">Your Ad Radar</span>
+    <h2 class="result-headline" id="result-headline">—</h2>
+    <p class="result-subhead" id="result-subhead"></p>
+    <div class="result-rule"></div>
+    <p class="result-insights-label">Tactics that appeared in your feed</p>
+    <div class="tactic-chips" id="tactic-chips"></div>
+    <p class="result-insights-label">Your answers — before vs. after</p>
+    <div class="survey-reveal" id="survey-reveal-block"></div>
+    <p class="result-insights-label">Key Takeaways</p>
+    <div id="result-insights"></div>
+    <button class="btn-ed-primary" onclick="goTo('s-reflect')">← Review Reflections</button>
+    <button class="btn-restart" onclick="restartApp()">↺ Try Again</button>
+    <div class="result-credit">ScrollTrap · NYU LTXD Spring 2026<br>A media literacy simulation exploring persuasion tactics in algorithmic short-video feeds.</div>
+  </div>
+</section>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────
+var CARDS = [
+  {
+    id:0, isAd:false, bg:'#0f1a2e', emoji:'🎓', avi:'👨‍💻', aviBg:'#1a3a5c',
+    author:'Nathan K.', handle:'@studywithnate',
+    caption:'Finally submitted my thesis draft 😮‍💨 three all-nighters later. Shoutout to everyone grinding rn — you got this.',
+    tags:'#collegelife #thesis #finalsseason',
+    comments:[{u:'priya_reads',t:'you got this!! almost there 💪'},{u:'jlee_campus',t:'same energy honestly'}],
+    likes:'2.1K', shares:'84', cta:null, shop:null,
+    tactic:null, explain:null
+  },
+  {
+    id:1, isAd:true, bg:'#1a1208', emoji:'☕', avi:'👩', aviBg:'#3d2b0f',
+    author:'Mia Chen', handle:'@mia.dailyvlog',
+    caption:'my honest morning routine ☀️ the thing that genuinely changed everything for me was switching my coffee — tried this matcha latte mix and I literally cannot go back. link in bio if you want it',
+    tags:'#morningroutine #collegevlog #wellness',
+    comments:[{u:'soph_eats',t:'omg which one is it 👀'},{u:'user883921',t:'link works!! got 15% off with her code'}],
+    likes:'18.4K', shares:'3.2K', cta:'Shop Now — 15% Off',
+    tactic:'Lifestyle Embedding',
+    explain:'The product appears inside a <mark>genuine morning routine</mark> — trust is built before the pitch. Words like <mark>honestly</mark> and <mark>genuinely</mark> signal authenticity, making the recommendation feel like personal advice rather than paid promotion.',
+    shop:{
+      name:'MatchaFlow Daily Latte Mix', seller:'HealthyU Store · 12k sold',
+      price:'$18.99', was:'$34.00', save:'44% OFF', reviews:847,
+      items:[
+        {avi:'S',name:'sarah_w.',text:'This actually fixed my afternoon slump. Been ordering for 3 months straight!'},
+        {avi:'J',name:'jasmin.r',text:'Tastes amazing and I genuinely feel better. The creator was not lying.'},
+        {avi:'K',name:'kt_wellness',text:'Great product, fast shipping. Will buy again for sure.'}
+      ],
+      revealTitle:'This is a paid partnership.',
+      revealBody:'The countdown timer and 44% off pricing are <mark>always active</mark> — there is no real sale. The reviews may include incentivized buyers. Only 3 left is a dynamic string that resets automatically.'
+    }
+  },
+  {
+    id:2, isAd:true, bg:'#0f1a0f', emoji:'⌚', avi:'👦', aviBg:'#0f2a1a',
+    author:'Alex Rivera', handle:'@alex.techreviews',
+    caption:'⚡ FLASH DEAL — 3 HOURS LEFT. My followers get exclusive early access: this smartwatch just dropped to $49 (was $129). Tested it for a month — best budget smartwatch I\'ve tried. Swipe up before it expires.',
+    tags:'#deal #techdeals #limitedtime',
+    comments:[{u:'mike_tech99',t:'got it!! shipping in 2 days'},{u:'bargain_finds',t:'these deals never last — act fast'}],
+    likes:'41.2K', shares:'12.1K', cta:'⏰ Grab Deal — 3 hrs left',
+    tactic:'Artificial Scarcity and Urgency',
+    explain:'Countdown timers and limited supply language <mark>short-circuit deliberate thinking</mark>. Your brain switches from "do I want this?" to "will I miss out?" — a classic <mark>loss aversion trigger</mark>. The flash deal framing creates urgency unrelated to the product\'s actual value.',
+    shop:{
+      name:'FitTrack Pro Smart Watch', seller:'TechDeals Official · 89k sold',
+      price:'$49.00', was:'$129.00', save:'62% OFF', reviews:3241,
+      items:[
+        {avi:'M',name:'mike_tech99',text:'Already on my second one. Great value for the price.'},
+        {avi:'A',name:'alex.buys',text:'Bought this for my whole family. Everyone loves it!'},
+        {avi:'R',name:'rev_verified',text:'Solid watch. Does everything it says. No complaints.'}
+      ],
+      revealTitle:'The timer resets every time you visit.',
+      revealBody:'This flash deal has been running for <mark>months</mark>. The $129 original price was set artificially high — this product has never sold at that price. The countdown is a JavaScript timer that resets on every page load.'
+    }
+  },
+  {
+    id:3, isAd:false, bg:'#110d1f', emoji:'🎮', avi:'🎮', aviBg:'#2d1f4a',
+    author:'game.clips.daily', handle:'@game.clips.daily',
+    caption:'How did he even do this 😭 the timing on this move is absolutely insane',
+    tags:'#gaming #fypシ #clips',
+    comments:[{u:'ctrl.gamer',t:'bro cheating 💀'},{u:'nova_plays',t:'frame perfect lmao'}],
+    likes:'89K', shares:'22K', cta:null, shop:null,
+    tactic:null, explain:null
+  },
+  {
+    id:4, isAd:true, bg:'#1a0f1a', emoji:'✨', avi:'💄', aviBg:'#3d1545',
+    author:'Sofia M.', handle:'@sofiaskincorner',
+    caption:'Okay I kept getting asked what I use so here it is 👇 This serum fixed my skin barrier in 2 weeks. I know everyone says that but I have receipts (swipe). Under $30 too which is crazy because it works better than the $80 one.',
+    tags:'#skincareroutine #glowup #skintok',
+    comments:[{u:'real_skincare_fan',t:'can confirm this works!! been using 3 months'},{u:'beauty_obsessed',t:'10/10 gifted this to my sister too'},{u:'skincareadvice99',t:'fixed my redness omg'}],
+    likes:'127K', shares:'31K', cta:'Find It Here →',
+    tactic:'Social Proof and Comment Seeding',
+    explain:'"Everyone kept asking" signals <mark>high demand before you evaluate the product</mark>. The comment section reinforces this — but comments may be seeded to manufacture consensus. "I have receipts" preemptively defuses skepticism, a classic credibility move.',
+    shop:{
+      name:'BarrierFix Peptide Serum', seller:'GlowLab Beauty · 43k sold',
+      price:'$27.99', was:'$82.00', save:'65% OFF', reviews:2109,
+      items:[
+        {avi:'L',name:'laura.glow',text:'My skin is literally transformed. Cannot believe it is this affordable.'},
+        {avi:'P',name:'prettypores',text:'Sofia introduced me to this and I have not stopped using it since!'},
+        {avi:'B',name:'beautyblogr',text:'Sent this to all my friends. Everyone is obsessed. 10/10 recommend.'}
+      ],
+      revealTitle:'Those comments were likely seeded.',
+      revealBody:'The three comment accounts were <mark>brand affiliate accounts</mark> posting coordinated praise. "I kept getting asked" is a scripted opener — Sofia received this product for free plus a commission. The 65% discount makes $28 feel like a bargain against a fabricated $82 anchor price.'
+    }
+  },
+  {
+    id:5, isAd:false, bg:'#0f1520', emoji:'🌆', avi:'📸', aviBg:'#1a2d4a',
+    author:'urban.lens', handle:'@urban.lens',
+    caption:'Golden hour in NYC hits different every time 🌇',
+    tags:'#nyc #photography #goldenHour',
+    comments:[{u:'jayroams',t:'this city man 😮'},{u:'travel.snaps',t:'what camera did you use?'}],
+    likes:'54K', shares:'8.9K', cta:null, shop:null,
+    tactic:null, explain:null
+  },
+  {
+    id:6, isAd:true, bg:'#0f1408', emoji:'📚', avi:'📖', aviBg:'#1f2d0a',
+    author:'Jess | Productivity', handle:'@jess.studysmarter',
+    caption:'The planner that actually fixed my semester 🎯 I\'ve tried everything. This one has a weekly reflection section that changed how I study. My GPA went from 3.1 to 3.7. If you\'re a student who feels overwhelmed — just try it.',
+    tags:'#studytok #productivityhacks #college',
+    comments:[{u:'college.tips.101',t:'bought this last semester — helped so much'},{u:'studywithme_anna',t:'waiting for mine to arrive!! excited'}],
+    likes:'33K', shares:'9.4K', cta:'Get the Planner →',
+    tactic:'Testimonial and Identity Targeting',
+    explain:'Specific numbers like <mark>GPA 3.1 to 3.7</mark> feel like evidence but are unverifiable. "If you are a student who feels overwhelmed" targets a <mark>shared identity</mark> — when you feel seen, that connection transfers directly to the product.',
+    shop:{
+      name:'StudySmart Weekly Planner 2025', seller:'ProductiveCo · 21k sold',
+      price:'$24.99', was:'$45.00', save:'44% OFF', reviews:1876,
+      items:[
+        {avi:'A',name:'anna.studies',text:'Jess\'s recommendation changed my whole semester. This planner is everything.'},
+        {avi:'C',name:'college_tips',text:'My GPA went up after using this. Highly recommend for any student!'},
+        {avi:'T',name:'t.organizer',text:'Simple, clean, effective. Does exactly what it promises.'}
+      ],
+      revealTitle:'The GPA claim cannot be verified.',
+      revealBody:'"My GPA went from 3.1 to 3.7" is <mark>unverifiable and anecdotal</mark>. Jess is a paid affiliate earning commission on every sale. The top comments are from accounts that consistently appear across her sponsored posts.'
+    }
+  },
+  {
+    id:7, isAd:true, bg:'#1a1208', emoji:'🔁', avi:'🤖', aviBg:'#2a1f10',
+    author:'For You · Based on your activity', handle:'@algorithm',
+    caption:'✨ Because you engaged with morning routine content earlier — here\'s another pick. This matcha latte mix keeps appearing in feeds like yours. 47,000 people in your area have saved this post.',
+    tags:'#foryou #recommended #trending',
+    comments:[{u:'feed_watcher',t:'this literally followed me all week lol'},{u:'notanbot2847',t:'ordered it!! so worth it'}],
+    likes:'203K', shares:'44K', cta:'Add to Cart →',
+    tactic:'Algorithmic Repetition and Social Proximity',
+    explain:'This simulates the algorithm reinforcing earlier engagement. <mark>Repeated exposure creates familiarity</mark>, and familiarity is misread as preference — the mere exposure effect. "47,000 people in your area" adds false local social proof to amplify the pressure.',
+    shop:{
+      name:'MatchaFlow Daily Latte Mix', seller:'HealthyU Store · 12k sold',
+      price:'$18.99', was:'$34.00', save:'44% OFF', reviews:847,
+      items:[
+        {avi:'N',name:'nearby_user',text:'Everyone in my neighborhood is talking about this. Had to try it!'},
+        {avi:'U',name:'user_49281',text:'Saw this recommended to me 5 times this week. Finally bought it. Worth it.'},
+        {avi:'T',name:'trending_buys',text:'This is literally everywhere right now. You need to try it.'}
+      ],
+      revealTitle:'This is the same product as Card 1.',
+      revealBody:'You have now seen this product <mark>twice</mark> — algorithmic repetition in action. "47,000 people in your area" is a <mark>fabricated social proof number</mark>. The algorithm detected your earlier engagement and served the same product again.'
+    }
+  }
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────
+var current = 0;
+var liked = {};
+var hintGone = false;
+var dwellTimes = {};
+var cardStartTime = null;
+var shopTimer = null;
+var shopCountdown = 167;
+var shopCurrentCard = 0;
+var surveyAnswers = {1:null, 2:null, 3:null};
+
+// ─── NAV ─────────────────────────────────────────────────────────────
+function goTo(id) {
+  var screens = document.querySelectorAll('.screen');
+  for (var i = 0; i < screens.length; i++) screens[i].classList.remove('active');
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+  var isEd = (id === 's-reveal' || id === 's-reflect' || id === 's-result');
+  document.body.classList.toggle('editorial', isEd);
+}
+
+// ─── SURVEY ──────────────────────────────────────────────────────────
+function selectOpt(btn, q, val) {
+  var opts = document.querySelectorAll('.survey-opt');
+  for (var i = 0; i < opts.length; i++) {
+    if (opts[i].getAttribute('onclick') && opts[i].getAttribute('onclick').indexOf(','+q+',') > -1) {
+      opts[i].classList.remove('selected');
+    }
+  }
+  btn.classList.add('selected');
+  surveyAnswers[q] = val;
+  var submit = document.getElementById('survey-submit');
+  submit.disabled = !(surveyAnswers[1] && surveyAnswers[2] && surveyAnswers[3]);
+}
+
+function submitSurvey() {
+  if (!surveyAnswers[1] || !surveyAnswers[2] || !surveyAnswers[3]) return;
+  startFeed();
+}
+
+// ─── DWELL ───────────────────────────────────────────────────────────
+function startDwell() { cardStartTime = Date.now(); }
+
+function stopDwell(i) {
+  if (cardStartTime === null) return;
+  var secs = Math.round((Date.now() - cardStartTime) / 1000);
+  dwellTimes[i] = (dwellTimes[i] || 0) + secs;
+  cardStartTime = null;
+}
+
+function formatTime(secs) {
+  if (secs < 60) return secs + 's';
+  var m = Math.floor(secs / 60);
+  var s = secs % 60;
+  return s > 0 ? (m + 'm ' + s + 's') : (m + 'm');
+}
+
+// ─── FEED ────────────────────────────────────────────────────────────
+function buildFeed() {
+  var vp = document.getElementById('card-viewport');
+  var old = vp.querySelectorAll('.feed-card');
+  for (var i = 0; i < old.length; i++) old[i].remove();
+
+  var pips = document.getElementById('feed-pips');
+  pips.innerHTML = '';
+  for (var i = 0; i < CARDS.length; i++) {
+    var p = document.createElement('div');
+    p.className = 'prog-pip';
+    p.id = 'pip-' + i;
+    pips.appendChild(p);
+  }
+
+  for (var i = 0; i < CARDS.length; i++) {
+    (function(idx) {
+      var card = CARDS[idx];
+      var el = document.createElement('div');
+      el.className = 'feed-card' + (idx === 0 ? ' active' : '');
+      el.id = 'fc-' + idx;
+
+      // comments HTML
+      var commentsHtml = '';
+      if (card.comments) {
+        var lines = '';
+        for (var c = 0; c < Math.min(2, card.comments.length); c++) {
+          lines += '<div class="comment-line"><span class="comment-name">' + card.comments[c].u + '</span> ' + card.comments[c].t + '</div>';
+        }
+        commentsHtml = '<div class="card-comments-strip">' + lines + '</div>';
+      }
+
+      // cta HTML
+      var ctaHtml = '';
+      if (card.cta) {
+        ctaHtml = '<span class="card-cta-strip" onclick="event.stopPropagation();openShop(' + idx + ')">🛍 ' + card.cta + '</span>';
+      }
+
+      el.innerHTML =
+        '<div class="card-vis">' +
+          '<div class="card-vis-bg" style="background:' + card.bg + '"><span class="card-vis-emoji">' + card.emoji + '</span></div>' +
+          '<div class="card-gradient"></div>' +
+          '<div class="card-info">' +
+            '<div class="card-author-row">' +
+              '<div class="author-avi" style="background:' + card.aviBg + '">' + card.avi + '</div>' +
+              '<div><div class="author-name">' + card.author + '</div><div class="author-handle">' + card.handle + '</div></div>' +
+              '<button class="follow-pill" onclick="event.stopPropagation()">Follow</button>' +
+            '</div>' +
+            '<p class="card-caption">' + card.caption + '</p>' +
+            '<p class="card-hashtags">' + card.tags + '</p>' +
+            ctaHtml +
+          '</div>' +
+          '<div class="card-sidebar">' +
+            '<button class="sidebar-action heart-action" id="hb-' + idx + '" onclick="event.stopPropagation();toggleLike(' + idx + ')">' +
+              '<div class="sidebar-icon">🤍</div>' +
+              '<span class="sidebar-label">' + (card.likes || 'Like') + '</span>' +
+            '</button>' +
+            '<button class="sidebar-action" onclick="event.stopPropagation()">' +
+              '<div class="sidebar-icon">💬</div>' +
+              '<span class="sidebar-label">' + (card.shares || '—') + '</span>' +
+            '</button>' +
+            '<button class="sidebar-action" onclick="event.stopPropagation()">' +
+              '<div class="sidebar-icon">↗️</div>' +
+              '<span class="sidebar-label">Share</span>' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+        commentsHtml;
+
+      vp.appendChild(el);
+    })(i);
+  }
+  updatePips();
+}
+
+function toggleLike(i) {
+  var btn = document.getElementById('hb-' + i);
+  if (liked[i]) {
+    delete liked[i];
+    btn.classList.remove('is-liked');
+    btn.querySelector('.sidebar-icon').textContent = '🤍';
+  } else {
+    liked[i] = true;
+    btn.classList.add('is-liked');
+    btn.querySelector('.sidebar-icon').textContent = '❤️';
+  }
+  updatePips();
+}
+
+function advance() {
+  if (!hintGone) {
+    document.getElementById('feed-instruct').classList.add('hide');
+    hintGone = true;
+  }
+  stopDwell(current);
+  if (current < CARDS.length - 1) {
+    var cur = document.getElementById('fc-' + current);
+    cur.classList.add('exiting');
+    setTimeout(function() { cur.classList.remove('active', 'exiting'); }, 320);
+    current++;
+    var next = document.getElementById('fc-' + current);
+    setTimeout(function() {
+      next.classList.add('active', 'entering');
+      next.addEventListener('animationend', function() { next.classList.remove('entering'); }, {once: true});
+      startDwell();
+    }, 80);
+    updatePips();
+  } else {
+    stopDwell(current);
+    buildReveal();
+    goTo('s-reveal');
+  }
+}
+
+function updatePips() {
+  for (var i = 0; i < CARDS.length; i++) {
+    var p = document.getElementById('pip-' + i);
+    if (!p) continue;
+    p.className = 'prog-pip';
+    if (i < current) {
+      p.classList.add(liked[i] ? 'liked' : 'done');
+    } else if (i === current) {
+      p.classList.add('current');
+    }
+  }
+}
+
+// ─── SHOP ────────────────────────────────────────────────────────────
+// ─── SHOP BUILDERS ───────────────────────────────────────────────────
+
+function buildShopCard1(card) {
+  // Mia – email capture to unlock discount
+  var s = card.shop;
+  return '<div class="shop-handle"></div>' +
+    '<div class="shop-hero">' +
+      '<div class="shop-thumb" style="background:' + card.bg + '">' + card.emoji + '</div>' +
+      '<div><div class="shop-product-name">' + s.name + '</div>' +
+      '<div class="shop-seller">' + s.seller + '</div>' +
+      '<span class="shop-stars">★★★★★</span><span class="shop-rev-count"> (' + s.reviews.toLocaleString() + ' reviews)</span></div>' +
+    '</div>' +
+    '<div class="shop-price-row">' +
+      '<span class="shop-price-now">' + s.price + '</span>' +
+      '<span class="shop-price-was">' + s.was + '</span>' +
+      '<span class="shop-price-save">' + s.save + '</span>' +
+    '</div>' +
+    '<div class="shop-email-capture">' +
+      '<div class="shop-email-label">🎁 Unlock your exclusive 15% discount</div>' +
+      '<div class="shop-email-sub">Enter your email to receive your personal code instantly.</div>' +
+      '<div class="shop-email-row">' +
+        '<input class="shop-email-input" id="shop-email-input" type="email" placeholder="your@email.com">' +
+        '<button class="shop-email-btn" onclick="unlockDiscount()">Unlock</button>' +
+      '</div>' +
+      '<div class="shop-email-fine-print">By entering your email you agree to receive marketing emails from HealthyU and its partners. We may share your data with third-party advertisers. Unsubscribe at any time via a link buried in email footer.</div>' +
+    '</div>' +
+    '<div class="shop-stock"><div class="shop-stock-bar"><div class="shop-stock-fill"></div></div><span class="shop-stock-label">Only 3 left!</span></div>' +
+    '<div class="shop-reviews-section"><div class="shop-reviews-title">Top Reviews</div>' + buildReviews(s.items) + '</div>' +
+    '<div class="shop-cta-area">' +
+      '<div class="shop-reveal-banner" id="shop-reveal-banner">' +
+        '<p class="shop-reveal-eyebrow">⚡ Dark Pattern: Email Harvesting</p>' +
+        '<p class="shop-reveal-title">' + s.revealTitle + '</p>' +
+        '<p class="shop-reveal-body">' + s.revealBody + '</p>' +
+        '<button class="shop-close" onclick="closeShop()">← Back to Feed</button>' +
+      '</div>' +
+      '<button class="shop-add-btn" id="shop-add-btn" onclick="triggerShopReveal(' + shopCurrentCard + ')">Get My Discount & Buy Now</button>' +
+    '</div>';
+}
+
+function buildShopCard2(card) {
+  // Alex – countdown that visibly resets at zero
+  var s = card.shop;
+  return '<div class="shop-handle"></div>' +
+    '<div class="shop-hero">' +
+      '<div class="shop-thumb" style="background:' + card.bg + '">' + card.emoji + '</div>' +
+      '<div><div class="shop-product-name">' + s.name + '</div>' +
+      '<div class="shop-seller">' + s.seller + '</div>' +
+      '<span class="shop-stars">★★★★★</span><span class="shop-rev-count"> (' + s.reviews.toLocaleString() + ' reviews)</span></div>' +
+    '</div>' +
+    '<div class="shop-price-row">' +
+      '<span class="shop-price-now">' + s.price + '</span>' +
+      '<span class="shop-price-was">' + s.was + '</span>' +
+      '<span class="shop-price-save">' + s.save + '</span>' +
+    '</div>' +
+    '<div class="shop-urgency">' +
+      '<span class="shop-urgency-icon">⏰</span>' +
+      '<div class="shop-urgency-text"><strong>Flash deal ends in</strong><br><span class="shop-countdown" id="shop-countdown">00:08</span><br><span style="font-size:10px;opacity:0.7">Watch what happens when it hits zero...</span></div>' +
+    '</div>' +
+    '<div class="shop-stock"><div class="shop-stock-bar"><div class="shop-stock-fill"></div></div><span class="shop-stock-label">Only 3 left!</span></div>' +
+    '<div class="shop-reviews-section"><div class="shop-reviews-title">Top Reviews</div>' + buildReviews(s.items) + '</div>' +
+    '<div class="shop-cta-area">' +
+      '<div class="shop-reveal-banner" id="shop-reveal-banner">' +
+        '<p class="shop-reveal-eyebrow">⚡ Dark Pattern: Fake Countdown</p>' +
+        '<p class="shop-reveal-title">' + s.revealTitle + '</p>' +
+        '<p class="shop-reveal-body">' + s.revealBody + '</p>' +
+        '<button class="shop-close" onclick="closeShop()">← Back to Feed</button>' +
+      '</div>' +
+      '<button class="shop-add-btn" id="shop-add-btn" onclick="triggerShopReveal(' + shopCurrentCard + ')">Buy Before It Expires</button>' +
+    '</div>';
+}
+
+function buildShopCard4(card) {
+  // Sofia – seeded reviews with fake/real reveal + purchase ticker
+  var s = card.shop;
+  var reviewsHtml = '';
+  var fakeness = [true, true, false];
+  for (var i = 0; i < s.items.length; i++) {
+    var r = s.items[i];
+    var isFake = fakeness[i];
+    reviewsHtml +=
+      '<div class="shop-review-item" id="rev-' + i + '">' +
+        '<span class="shop-review-tag ' + (isFake ? 'fake' : 'real') + '" id="rev-tag-' + i + '">' + (isFake ? 'Affiliate' : 'Verified') + '</span>' +
+        '<div class="shop-review-top">' +
+          '<div class="shop-review-avi">' + r.avi + '</div>' +
+          '<span class="shop-review-name">' + r.name + '</span>' +
+          '<span class="shop-review-stars">★★★★★</span>' +
+          '<span class="shop-review-verified">✓ Verified</span>' +
+        '</div>' +
+        '<div class="shop-review-text">' + r.text + '</div>' +
+      '</div>';
+  }
+  return '<div class="shop-handle"></div>' +
+    '<div class="shop-hero">' +
+      '<div class="shop-thumb" style="background:' + card.bg + '">' + card.emoji + '</div>' +
+      '<div><div class="shop-product-name">' + s.name + '</div>' +
+      '<div class="shop-seller">' + s.seller + '</div>' +
+      '<span class="shop-stars">★★★★★</span><span class="shop-rev-count"> (' + s.reviews.toLocaleString() + ' reviews)</span></div>' +
+    '</div>' +
+    '<div class="shop-price-row">' +
+      '<span class="shop-price-now">' + s.price + '</span>' +
+      '<span class="shop-price-was">' + s.was + '</span>' +
+      '<span class="shop-price-save">' + s.save + '</span>' +
+    '</div>' +
+    '<div class="shop-ticker">' +
+      '<div class="shop-ticker-inner">' +
+        '<div class="shop-ticker-item">Sarah M. just purchased this · 1 min ago</div>' +
+        '<div class="shop-ticker-item">Jessica L. just purchased this · 2 min ago</div>' +
+        '<div class="shop-ticker-item">Amy K. just purchased this · 3 min ago</div>' +
+        '<div class="shop-ticker-item">Rachel T. just purchased this · 4 min ago</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="shop-stock"><div class="shop-stock-bar"><div class="shop-stock-fill"></div></div><span class="shop-stock-label">Only 3 left!</span></div>' +
+    '<div class="shop-reviews-section"><div class="shop-reviews-title">Top Reviews</div>' + reviewsHtml + '</div>' +
+    '<div class="shop-cta-area">' +
+      '<div class="shop-reveal-banner" id="shop-reveal-banner">' +
+        '<p class="shop-reveal-eyebrow">⚡ Dark Pattern: Fake Social Proof</p>' +
+        '<p class="shop-reveal-title">' + s.revealTitle + '</p>' +
+        '<p class="shop-reveal-body">' + s.revealBody + '</p>' +
+        '<button class="shop-close" onclick="closeShop()">← Back to Feed</button>' +
+      '</div>' +
+      '<button class="shop-add-btn" id="shop-add-btn" onclick="triggerShopReveal(' + shopCurrentCard + ')">Add to Cart — Everyone Is Buying</button>' +
+    '</div>';
+}
+
+function buildShopCard6(card) {
+  // Jess – anchor price stack + pre-checked subscription
+  var s = card.shop;
+  return '<div class="shop-handle"></div>' +
+    '<div class="shop-hero">' +
+      '<div class="shop-thumb" style="background:' + card.bg + '">' + card.emoji + '</div>' +
+      '<div><div class="shop-product-name">' + s.name + '</div>' +
+      '<div class="shop-seller">' + s.seller + '</div>' +
+      '<span class="shop-stars">★★★★★</span><span class="shop-rev-count"> (' + s.reviews.toLocaleString() + ' reviews)</span></div>' +
+    '</div>' +
+    '<div class="shop-price-row">' +
+      '<span class="shop-price-now">' + s.price + '</span>' +
+      '<span class="shop-price-save">' + s.save + '</span>' +
+    '</div>' +
+    '<div class="shop-anchor-stack">' +
+      '<span class="shop-anchor-item">Was $89.00</span>' +
+      '<span class="shop-anchor-arrow">→</span>' +
+      '<span class="shop-anchor-item">Then $62.00</span>' +
+      '<span class="shop-anchor-arrow">→</span>' +
+      '<span class="shop-anchor-item">Then $45.00</span>' +
+      '<span class="shop-anchor-arrow">→</span>' +
+      '<span class="shop-anchor-label">Now $24.99</span>' +
+    '</div>' +
+    '<div class="shop-subscribe-row">' +
+      '<input type="checkbox" class="shop-subscribe-check" id="shop-subscribe" checked>' +
+      '<label class="shop-subscribe-text" for="shop-subscribe">Auto-enroll in <strong>Planner Club</strong> — receive next edition quarterly at <strong>$19.99/quarter</strong>. Cancel anytime via account settings.</label>' +
+    '</div>' +
+    '<div class="shop-stock"><div class="shop-stock-bar"><div class="shop-stock-fill"></div></div><span class="shop-stock-label">Only 3 left!</span></div>' +
+    '<div class="shop-reviews-section"><div class="shop-reviews-title">Top Reviews</div>' + buildReviews(s.items) + '</div>' +
+    '<div class="shop-cta-area">' +
+      '<div class="shop-reveal-banner" id="shop-reveal-banner">' +
+        '<p class="shop-reveal-eyebrow">⚡ Dark Pattern: Hidden Subscription</p>' +
+        '<p class="shop-reveal-title">' + s.revealTitle + '</p>' +
+        '<p class="shop-reveal-body">' + s.revealBody + '</p>' +
+        '<button class="shop-close" onclick="closeShop()">← Back to Feed</button>' +
+      '</div>' +
+      '<button class="shop-add-btn" id="shop-add-btn" onclick="triggerShopReveal(' + shopCurrentCard + ')">Buy Now — Best Price Ever</button>' +
+    '</div>';
+}
+
+function buildShopCard7(card) {
+  // Algorithm repeat – exit intent confirmshaming on close
+  var s = card.shop;
+  return '<div class="shop-exit-overlay" id="shop-exit-overlay">' +
+      '<div class="shop-exit-box">' +
+        '<div class="shop-exit-title">Wait — are you sure?</div>' +
+        '<div class="shop-exit-sub">This is the 2nd time this product has appeared in your feed. The algorithm thinks you want it. Are you sure you want to leave?</div>' +
+        '<button class="shop-exit-yes" onclick="confirmExitReveal()">Actually, show me the deal</button>' +
+        '<button class="shop-exit-no" onclick="forceCloseShop()">No, I don\'t care about saving money</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="shop-handle" id="shop-handle-close" style="cursor:pointer" onclick="tryCloseShop7()"></div>' +
+    '<div class="shop-hero">' +
+      '<div class="shop-thumb" style="background:' + card.bg + '">' + card.emoji + '</div>' +
+      '<div><div class="shop-product-name">' + s.name + '</div>' +
+      '<div class="shop-seller">' + s.seller + '</div>' +
+      '<span class="shop-stars">★★★★★</span><span class="shop-rev-count"> (' + s.reviews.toLocaleString() + ' reviews)</span></div>' +
+    '</div>' +
+    '<div class="shop-price-row">' +
+      '<span class="shop-price-now">' + s.price + '</span>' +
+      '<span class="shop-price-was">' + s.was + '</span>' +
+      '<span class="shop-price-save">' + s.save + '</span>' +
+    '</div>' +
+    '<div class="shop-urgency">' +
+      '<span class="shop-urgency-icon">⏰</span>' +
+      '<div class="shop-urgency-text"><strong>Flash deal ends in</strong><br><span class="shop-countdown" id="shop-countdown">02:47</span></div>' +
+    '</div>' +
+    '<div class="shop-stock"><div class="shop-stock-bar"><div class="shop-stock-fill"></div></div><span class="shop-stock-label">Only 3 left!</span></div>' +
+    '<div class="shop-reviews-section"><div class="shop-reviews-title">Top Reviews</div>' + buildReviews(s.items) + '</div>' +
+    '<div class="shop-cta-area">' +
+      '<div class="shop-reveal-banner" id="shop-reveal-banner">' +
+        '<p class="shop-reveal-eyebrow">⚡ Dark Pattern: Confirmshaming</p>' +
+        '<p class="shop-reveal-title">' + s.revealTitle + '</p>' +
+        '<p class="shop-reveal-body">' + s.revealBody + '</p>' +
+        '<button class="shop-close" onclick="forceCloseShop()">← Back to Feed</button>' +
+      '</div>' +
+      '<button class="shop-add-btn" id="shop-add-btn" onclick="triggerShopReveal(' + shopCurrentCard + ')">Add to Cart →</button>' +
+    '</div>';
+}
+
+function buildReviews(items) {
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    var r = items[i];
+    html += '<div class="shop-review-item">' +
+      '<div class="shop-review-top">' +
+        '<div class="shop-review-avi">' + r.avi + '</div>' +
+        '<span class="shop-review-name">' + r.name + '</span>' +
+        '<span class="shop-review-stars">★★★★★</span>' +
+        '<span class="shop-review-verified">✓ Verified</span>' +
+      '</div>' +
+      '<div class="shop-review-text">' + r.text + '</div>' +
+    '</div>';
+  }
+  return html;
+}
+
+function openShop(cardIdx) {
+  var card = CARDS[cardIdx];
+  if (!card.shop) return;
+  shopCurrentCard = cardIdx;
+
+  var sheet = document.getElementById('shop-sheet-inner');
+  if (cardIdx === 1) sheet.innerHTML = buildShopCard1(card);
+  else if (cardIdx === 2) sheet.innerHTML = buildShopCard2(card);
+  else if (cardIdx === 4) sheet.innerHTML = buildShopCard4(card);
+  else if (cardIdx === 6) sheet.innerHTML = buildShopCard6(card);
+  else if (cardIdx === 7) sheet.innerHTML = buildShopCard7(card);
+
+  // start countdown timer
+  if (shopTimer) clearInterval(shopTimer);
+  var cdEl = document.getElementById('shop-countdown');
+  if (cdEl) {
+    if (cardIdx === 2) {
+      // short countdown that visibly resets
+      shopCountdown = 8;
+    } else {
+      shopCountdown = 167;
+    }
+    updateShopCountdown();
+    shopTimer = setInterval(function() {
+      shopCountdown--;
+      if (shopCountdown <= 0) {
+        if (cardIdx === 2) {
+          // flash and reset — user can see it happen
+          var cdEl2 = document.getElementById('shop-countdown');
+          if (cdEl2) {
+            cdEl2.classList.add('reset-flash');
+            setTimeout(function() {
+              shopCountdown = 167;
+              updateShopCountdown();
+              var cdEl3 = document.getElementById('shop-countdown');
+              if (cdEl3) cdEl3.classList.remove('reset-flash');
+              // auto-trigger reveal after reset
+              setTimeout(function() { triggerShopReveal(cardIdx); }, 800);
+            }, 500);
+          }
+          clearInterval(shopTimer); shopTimer = null;
+          return;
+        } else {
+          shopCountdown = 167;
+        }
+      }
+      updateShopCountdown();
+    }, 1000);
+  }
+
+  document.getElementById('shop-overlay').classList.add('open');
+}
+
+function updateShopCountdown() {
+  var el = document.getElementById('shop-countdown');
+  if (!el) return;
+  var m = String(Math.floor(shopCountdown / 60)).padStart(2, '0');
+  var s = String(shopCountdown % 60).padStart(2, '0');
+  el.textContent = m + ':' + s;
+}
+
+function unlockDiscount() {
+  var input = document.getElementById('shop-email-input');
+  if (!input || !input.value) { input.style.borderColor = '#e74c3c'; return; }
+  triggerShopReveal(shopCurrentCard);
+}
+
+function triggerShopReveal(cardIdx) {
+  var addBtn = document.getElementById('shop-add-btn');
+  if (addBtn) addBtn.style.display = 'none';
+  var exit = document.getElementById('shop-exit-overlay');
+  if (exit) exit.classList.remove('show');
+  // reveal seeded reviews for card 4
+  if (cardIdx === 4) {
+    var fakeness = [true, true, false];
+    for (var i = 0; i < fakeness.length; i++) {
+      var item = document.getElementById('rev-' + i);
+      var tag = document.getElementById('rev-tag-' + i);
+      if (item && tag) {
+        tag.classList.add('show');
+        item.classList.add(fakeness[i] ? 'fake-review' : 'real-review');
+      }
+    }
+  }
+  var banner = document.getElementById('shop-reveal-banner');
+  if (banner) banner.classList.add('show');
+  if (shopTimer) { clearInterval(shopTimer); shopTimer = null; }
+  // auto-like current card
+  if (!liked[current]) {
+    liked[current] = true;
+    var btn = document.getElementById('hb-' + current);
+    if (btn) { btn.classList.add('is-liked'); btn.querySelector('.sidebar-icon').textContent = '❤️'; }
+    updatePips();
+  }
+}
+
+function tryCloseShop7() {
+  // dragging handle on card 7 triggers exit intent
+  var overlay = document.getElementById('shop-exit-overlay');
+  if (overlay) overlay.classList.add('show');
+}
+
+function confirmExitReveal() {
+  var overlay = document.getElementById('shop-exit-overlay');
+  if (overlay) overlay.classList.remove('show');
+  triggerShopReveal(shopCurrentCard);
+}
+
+function forceCloseShop() {
+  document.getElementById('shop-overlay').classList.remove('open');
+  if (shopTimer) { clearInterval(shopTimer); shopTimer = null; }
+}
+
+function closeShop() {
+  // for card 7, intercept close with exit intent
+  if (shopCurrentCard === 7) {
+    var banner = document.getElementById('shop-reveal-banner');
+    var alreadyRevealed = banner && banner.classList.contains('show');
+    if (!alreadyRevealed) {
+      var overlay = document.getElementById('shop-exit-overlay');
+      if (overlay) { overlay.classList.add('show'); return; }
+    }
+  }
+  document.getElementById('shop-overlay').classList.remove('open');
+  if (shopTimer) { clearInterval(shopTimer); shopTimer = null; }
+}
+
+// ─── REVEAL ──────────────────────────────────────────────────────────
+function buildReveal() {
+  var totalAds = 0;
+  for (var i = 0; i < CARDS.length; i++) { if (CARDS[i].isAd) totalAds++; }
+  var likedAds = 0;
+  var totalLiked = 0;
+  for (var i = 0; i < CARDS.length; i++) {
+    if (liked[i]) {
+      totalLiked++;
+      if (CARDS[i].isAd) likedAds++;
+    }
+  }
+
+  document.getElementById('sc-liked').textContent = totalLiked;
+  document.getElementById('sc-ads').textContent = totalAds;
+  document.getElementById('sc-liked-ads').textContent = likedAds;
+  document.getElementById('sc-organic').textContent = CARDS.length - totalAds;
+  document.getElementById('reveal-date').textContent = new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+
+  if (likedAds === 0) {
+    document.getElementById('reveal-headline').textContent = 'Sharp eye. None of the ads caught you.';
+  } else if (likedAds === 1) {
+    document.getElementById('reveal-headline').textContent = 'One hidden ad got through.';
+  } else {
+    document.getElementById('reveal-headline').textContent = likedAds + ' hidden ads caught you.';
+  }
+  document.getElementById('reveal-sub').textContent = 'You liked ' + totalLiked + ' video' + (totalLiked !== 1 ? 's' : '') + ' in total. Of the ' + totalAds + ' hidden ads in your feed, ' + likedAds + ' triggered a purchase impulse. Below is a full breakdown — including how long you spent on each post.';
+
+  // total dwell time
+  var totalSecs = 0;
+  for (var k in dwellTimes) totalSecs += dwellTimes[k];
+  document.getElementById('sc-total-time').textContent = formatTime(totalSecs);
+  var pct = Math.round((totalSecs / (95 * 60)) * 100);
+  document.getElementById('sc-time-compare').textContent = 'That\'s ' + pct + '% of the average TikTok user\'s daily screen time (95 min/day). You spent this on just 8 posts.';
+
+  // longest dwell
+  var maxDwell = 0;
+  for (var k in dwellTimes) { if (dwellTimes[k] > maxDwell) maxDwell = dwellTimes[k]; }
+
+  var body = document.getElementById('reveal-body');
+  body.innerHTML = '';
+
+  for (var i = 0; i < CARDS.length; i++) {
+    var card = CARDS[i];
+    var isLiked = !!liked[i];
+    var secs = dwellTimes[i] || 0;
+    var isLongest = (secs === maxDwell && secs > 2);
+
+    var div = document.createElement('div');
+    div.className = 'article-card';
+
+    var dwellHtml = '';
+    if (secs > 0) {
+      dwellHtml = '<span class="dwell-badge' + (isLongest ? ' high' : '') + '">⏱ ' + secs + 's on this post' + (isLongest ? ' · longest' : '') + '</span>';
+    }
+
+    var likedHtml = isLiked ? '<span class="liked-flag">❤️ you liked this</span>' : '';
+
+    var bodyHtml = '';
+    if (card.isAd) {
+      bodyHtml = '<p class="tactic-eyebrow">Persuasion Tactic</p>' +
+        '<p class="tactic-title">' + card.tactic + '</p>' +
+        '<p class="tactic-body">' + card.explain + '</p>';
+      if (secs >= 5) {
+        bodyHtml += '<p class="dwell-note">⚠️ You spent ' + secs + 's here' + (isLongest ? ' — the most of any post' : '') + '. Even without liking, this dwell time signals interest to a real algorithm.</p>';
+      }
+    } else {
+      bodyHtml = '<p class="organic-note">This was genuine content with no commercial intent — included as a control to test whether you could distinguish organic posts from embedded marketing.</p>';
+      if (secs >= 5) {
+        bodyHtml += '<p class="dwell-note" style="margin-top:8px;">You lingered ' + secs + 's here. On a real platform, this attention signal shapes what you see next.</p>';
+      }
+    }
+
+    div.innerHTML =
+      '<div class="article-header">' +
+        '<div class="article-thumb" style="background:' + card.bg + '">' + card.emoji + '</div>' +
+        '<div class="article-meta">' +
+          '<div class="article-title">' + card.author + '</div>' +
+          '<div class="article-byline">' + card.handle + '</div>' +
+          dwellHtml +
+        '</div>' +
+        '<div class="article-badges">' +
+          '<span class="verdict-badge ' + (card.isAd ? 'ad' : 'organic') + '">' + (card.isAd ? 'Hidden Ad' : 'Organic') + '</span>' +
+          likedHtml +
+        '</div>' +
+      '</div>' +
+      '<div class="article-body">' + bodyHtml + '</div>';
+
+    body.appendChild(div);
+  }
+}
+
+// ─── RESULT ──────────────────────────────────────────────────────────
+function buildResult() {
+  var totalAds = 0;
+  for (var i = 0; i < CARDS.length; i++) { if (CARDS[i].isAd) totalAds++; }
+  var likedAds = 0;
+  for (var i = 0; i < CARDS.length; i++) { if (liked[i] && CARDS[i].isAd) likedAds++; }
+  var score = Math.round(((totalAds - likedAds) / totalAds) * 100);
+
+  var headline, headlineClass, subhead, insights;
+  if (score >= 80) {
+    headline = 'Sharp.'; headlineClass = 'green';
+    subhead = 'You resisted ' + (totalAds - likedAds) + ' of ' + totalAds + ' hidden ads. Your critical awareness is well-calibrated — you noticed the signals most people scroll past.';
+    insights = [
+      {icon:'🛡️', text:'You liked ' + likedAds + ' hidden ad' + (likedAds !== 1 ? 's' : '') + ' — the ones that got through likely used the most naturalistic tactics.'},
+      {icon:'🔍', text:'You probably noticed cues like unverifiable claims, CTA buttons, or unnaturally enthusiastic comments.'},
+      {icon:'📌', text:'Next challenge: track how often the same product reappears across sessions — repetition is the quieter trap.'}
+    ];
+  } else if (score >= 40) {
+    headline = 'Aware.'; headlineClass = 'amber';
+    subhead = 'You caught some — but ' + likedAds + ' hidden ads still triggered a purchase impulse. The most effective tactics are the ones that feel the least like ads.';
+    insights = [
+      {icon:'⚠️', text:likedAds + ' ad' + (likedAds !== 1 ? 's' : '') + ' worked on you — each using a different mechanism.'},
+      {icon:'🎭', text:'Lifestyle embedding and social proof were likely the ones that got through — they feel the most authentic.'},
+      {icon:'📌', text:'Practice this: before you like anything, ask — is this creator being paid to recommend this?'}
+    ];
+  } else {
+    headline = 'Caught.'; headlineClass = 'red';
+    subhead = 'The feed was more persuasive than it looked. ' + likedAds + ' of ' + totalAds + ' hidden ads triggered a purchase impulse — which is exactly what they were designed to do.';
+    insights = [
+      {icon:'🕸️', text:likedAds + ' out of ' + totalAds + ' ads worked — not because you are inattentive, but because these tactics exploit deeply human instincts.'},
+      {icon:'🧠', text:'Trust, urgency, and identity — the three levers that worked — are universal human triggers, not personal weaknesses.'},
+      {icon:'📌', text:'Awareness is step one. Next scroll session: try naming the tactic out loud before you act on the impulse.'}
+    ];
+  }
+
+  var hl = document.getElementById('result-headline');
+  hl.textContent = headline;
+  hl.className = 'result-headline ' + headlineClass;
+  document.getElementById('result-subhead').textContent = subhead;
+
+  // tactic chips
+  var chips = document.getElementById('tactic-chips');
+  chips.innerHTML = '';
+  for (var i = 0; i < CARDS.length; i++) {
+    if (!CARDS[i].isAd) continue;
+    var triggered = !!liked[i];
+    var chip = document.createElement('span');
+    chip.className = 'tactic-chip' + (triggered ? ' triggered' : '');
+    chip.textContent = CARDS[i].tactic + (triggered ? ' ❤️' : '');
+    chips.appendChild(chip);
+  }
+
+  // insights
+  var insHtml = '';
+  for (var i = 0; i < insights.length; i++) {
+    insHtml += '<div class="insight-row"><div class="insight-icon-wrap">' + insights[i].icon + '</div><p class="insight-text">' + insights[i].text + '</p></div>';
+  }
+  document.getElementById('result-insights').innerHTML = insHtml;
+
+  // survey comparison
+  var surveyBlock = document.getElementById('survey-reveal-block');
+  if (surveyAnswers[1] && surveyAnswers[2] && surveyAnswers[3]) {
+    var confNote = '';
+    if (surveyAnswers[3] === 'Very confident' && likedAds >= 2) {
+      confNote = 'You were very confident — but ' + likedAds + ' ads still caught you.';
+    } else if (surveyAnswers[3] === 'Very confident' && likedAds <= 1) {
+      confNote = 'Your confidence was justified this time.';
+    } else if (surveyAnswers[3] === 'Not confident at all' && likedAds === 0) {
+      confNote = 'Your low confidence led to caution — and it worked.';
+    } else if (surveyAnswers[3] === 'Somewhat confident') {
+      confNote = 'You felt fairly capable. Your result: ' + likedAds + ' ad' + (likedAds !== 1 ? 's' : '') + ' caught you.';
+    } else {
+      confNote = 'You were not very confident. Your result: ' + likedAds + ' ad' + (likedAds !== 1 ? 's' : '') + ' caught you.';
+    }
+
+    var purchaseNote = '';
+    if (surveyAnswers[2] === 'Yes, multiple times' || surveyAnswers[2] === 'Yes, once') {
+      purchaseNote = '<span class="survey-row-note">You were already a target. The tactics in this feed were designed for people like you.</span>';
+    }
+
+    surveyBlock.style.display = 'block';
+    surveyBlock.innerHTML =
+      '<p class="survey-reveal-title">Before You Scrolled, You Said:</p>' +
+      '<div class="survey-row">' +
+        '<span class="survey-row-q">Daily screen time on short-video apps</span>' +
+        '<span class="survey-row-a">' + surveyAnswers[1] + '</span>' +
+      '</div>' +
+      '<div class="survey-row">' +
+        '<span class="survey-row-q">Bought something from a short video recently?</span>' +
+        '<span class="survey-row-a">' + surveyAnswers[2] + '</span>' +
+        purchaseNote +
+      '</div>' +
+      '<div class="survey-row">' +
+        '<span class="survey-row-q">Confidence in spotting hidden ads</span>' +
+        '<span class="survey-row-a">' + surveyAnswers[3] + '</span>' +
+        '<span class="survey-row-note">' + confNote + '</span>' +
+      '</div>';
+  } else {
+    surveyBlock.style.display = 'none';
+  }
+
+  goTo('s-result');
+}
+
+// ─── START / RESTART ─────────────────────────────────────────────────
+function startFeed() {
+  buildFeed();
+  goTo('s-feed');
+  setTimeout(startDwell, 350);
+}
+
+function restartApp() {
+  current = 0;
+  liked = {};
+  hintGone = false;
+  dwellTimes = {};
+  cardStartTime = null;
+  surveyAnswers = {1:null, 2:null, 3:null};
+  closeShop();
+  // reset survey buttons
+  var opts = document.querySelectorAll('.survey-opt');
+  for (var i = 0; i < opts.length; i++) opts[i].classList.remove('selected');
+  document.getElementById('survey-submit').disabled = true;
+  goTo('s-intro');
+}
+
+// ─── SWIPE + KEYBOARD ────────────────────────────────────────────────
+var ty0 = 0, tx0 = 0;
+document.addEventListener('touchstart', function(e) {
+  ty0 = e.touches[0].clientY;
+  tx0 = e.touches[0].clientX;
+}, {passive: true});
+
+document.addEventListener('touchend', function(e) {
+  if (!document.getElementById('s-feed').classList.contains('active')) return;
+  if (document.getElementById('shop-overlay').classList.contains('open')) return;
+  var dy = ty0 - e.changedTouches[0].clientY;
+  var dx = Math.abs(tx0 - e.changedTouches[0].clientX);
+  if (Math.abs(dy) > 35 && Math.abs(dy) > dx) advance();
+}, {passive: true});
+
+document.getElementById('shop-overlay').addEventListener('click', function(e) {
+  if (e.target === document.getElementById('shop-overlay')) closeShop();
+});
+
+document.addEventListener('keydown', function(e) {
+  if (!document.getElementById('s-feed').classList.contains('active')) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+    e.preventDefault();
+    advance();
+  }
+});
+</script>
+</body>
+</html>
