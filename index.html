@@ -476,7 +476,7 @@ body.editorial{background:var(--ed-bg);color:var(--ed-text);}
       <p class="continue-eyebrow">Algorithm Update</p>
       <h2 class="continue-title">The algorithm is<br>just getting <em>started.</em></h2>
       <p class="continue-body">
-        You've watched <strong>30 videos</strong>. Based on your likes, your feed is now
+        You've watched <strong>40 videos</strong>. Based on your likes, your feed is now
         personalized to you. The next videos will reflect what the algorithm has
         learned — which is exactly when things get <strong>interesting.</strong>
       </p>
@@ -505,7 +505,7 @@ body.editorial{background:var(--ed-bg);color:var(--ed-text);}
   <div class="feed-chrome">
     <div class="feed-topbar">
       <span class="feed-logo">For You</span>
-      <span class="feed-counter" id="feed-counter" onclick="handleCounterClick()">0 / 30</span>
+      <span class="feed-counter" id="feed-counter" onclick="handleCounterClick()">0 / 40</span>
       <button class="end-session-btn" id="end-session-btn" onclick="endSession()">End Session →</button>
     </div>
     <div class="feed-progress-bar-wrap">
@@ -527,7 +527,7 @@ body.editorial{background:var(--ed-bg);color:var(--ed-text);}
     <p class="reflect-kicker">Reflection · FeedLoop</p>
     <h2 class="reflect-title" id="reflect-title">You said you came for one thing. Your cart tells a different story.</h2>
 
-    <div class="algo-statement">
+    <div class="algo-statement" id="algo-statement">
       <p>The algorithm didn't push ads at you. It did something subtler — it watched what you paused on, what you liked, what you almost scrolled past but didn't.</p>
       <p>Then it quietly rebuilt your feed around those signals. <strong>You didn't decide to want these things.</strong> You were shown them — repeatedly, at the right moment, in the right format — until wanting felt natural.</p>
       <p>That's not a glitch. <strong>That's the design.</strong></p>
@@ -875,18 +875,24 @@ function initWeights() {
 }
 
 function buildInitialQueue() {
-  // Shuffle one card from each category, then repeat
-  // First 9: one from each cat (random)
   var queue = [];
   var cats = Object.keys(CATS);
 
-  // Build pool per category
+  // Build pool per category — deduplicate by image path first
   var pools = {};
+  var seenImgs = {};
   for (var i = 0; i < ALL_CARDS.length; i++) {
     var c = ALL_CARDS[i];
     if (!pools[c.cat]) pools[c.cat] = [];
-    pools[c.cat].push(c.id);
+    // Only add card if its image hasn't been seen in this category yet
+    var imgKey = c.img || c.id;
+    var catImgKey = c.cat + '|' + imgKey;
+    if (!seenImgs[catImgKey]) {
+      seenImgs[catImgKey] = true;
+      pools[c.cat].push(c.id);
+    }
   }
+
   // Shuffle each pool
   for (var cat in pools) {
     pools[cat] = shuffle(pools[cat]);
@@ -897,12 +903,25 @@ function buildInitialQueue() {
   for (var i = 0; i < firstRound.length; i++) {
     var cat = firstRound[i];
     if (pools[cat] && pools[cat].length > 0) {
-      queue.push({id: pools[cat].shift(), cat: cat});
+      var cardId = pools[cat].shift();
+      var card = null;
+      for (var k = 0; k < ALL_CARDS.length; k++) {
+        if (ALL_CARDS[k].id === cardId) { card = ALL_CARDS[k]; break; }
+      }
+      queue.push({id: cardId, cat: cat});
     }
   }
 
-  // Store remaining pools for weighted insertion
   window._pools = pools;
+  window._usedImgs = {};
+  // Pre-mark first round images as used
+  for (var qi = 0; qi < queue.length; qi++) {
+    var qcard = null;
+    for (var k = 0; k < ALL_CARDS.length; k++) {
+      if (ALL_CARDS[k].id === queue[qi].id) { qcard = ALL_CARDS[k]; break; }
+    }
+    if (qcard) window._usedImgs[qcard.img || qcard.id] = true;
+  }
   return queue;
 }
 
@@ -922,9 +941,8 @@ function getCardById(id) {
 }
 
 function pickNextCard() {
-  // Weighted random pick from remaining pools
   var pools = window._pools;
-  // Build weighted list
+  var usedImgs = window._usedImgs || {};
   var choices = [];
   for (var cat in pools) {
     if (pools[cat] && pools[cat].length > 0) {
@@ -935,23 +953,66 @@ function pickNextCard() {
     }
   }
   if (choices.length === 0) return null;
-  var picked = choices[Math.floor(Math.random() * choices.length)];
-  var cardId = pools[picked].shift();
-  if (!cardId) return null;
-  return {id: cardId, cat: picked};
+
+  // Shuffle choices and try to find a card with unused image (for first 40)
+  choices = shuffle(choices);
+  for (var attempt = 0; attempt < choices.length; attempt++) {
+    var picked = choices[attempt];
+    // Try cards in this category until we find one with unused image
+    var pool = pools[picked];
+    if (!pool || pool.length === 0) continue;
+
+    if (watchedCount < 40) {
+      // Find first card in pool whose image hasn't been used
+      for (var j = 0; j < pool.length; j++) {
+        var candidateCard = getCardById(pool[j]);
+        var imgKey = candidateCard ? (candidateCard.img || candidateCard.id) : pool[j];
+        if (!usedImgs[imgKey]) {
+          pool.splice(j, 1); // remove from pool
+          usedImgs[imgKey] = true;
+          return {id: candidateCard ? candidateCard.id : pool[j], cat: picked};
+        }
+      }
+      // All images in this category used — skip category this round
+      continue;
+    } else {
+      // After 40, no restriction
+      var cardId = pool.shift();
+      return {id: cardId, cat: picked};
+    }
+  }
+
+  // Fallback: if all categories exhausted unique images, just pick any
+  var fallbackCat = choices[0];
+  if (pools[fallbackCat] && pools[fallbackCat].length > 0) {
+    return {id: pools[fallbackCat].shift(), cat: fallbackCat};
+  }
+  return null;
 }
 
 function onLike(cardId, cat) {
   likedCards[cardId] = true;
   weights[cat] = (weights[cat] || 1) + 2;
-  // Insert a same-category card soon (next 1-3 positions) if available
   var pools = window._pools;
+  var usedImgs = window._usedImgs || {};
+
   if (pools[cat] && pools[cat].length > 0) {
-    var insertId = pools[cat].shift();
-    var insertPos = currentCardIdx + 1 + Math.floor(Math.random() * 3);
-    feedQueue.splice(insertPos, 0, {id: insertId, cat: cat});
-    // render the newly inserted card
-    renderCardAt(insertPos);
+    // Find a card in this category with unused image
+    var insertId = null;
+    for (var j = 0; j < pools[cat].length; j++) {
+      var candidate = getCardById(pools[cat][j]);
+      var imgKey = candidate ? (candidate.img || candidate.id) : pools[cat][j];
+      if (!usedImgs[imgKey] || watchedCount >= 40) {
+        insertId = pools[cat].splice(j, 1)[0];
+        if (candidate) usedImgs[imgKey] = true;
+        break;
+      }
+    }
+    if (insertId) {
+      var insertPos = currentCardIdx + 1 + Math.floor(Math.random() * 3);
+      feedQueue.splice(insertPos, 0, {id: insertId, cat: cat});
+      renderCardAt(insertPos);
+    }
   }
 }
 
@@ -1142,13 +1203,13 @@ function advance() {
   watchedCount++;
   var bar = document.getElementById('feed-progress-bar');
   var counter = document.getElementById('feed-counter');
-  var pct = Math.min((watchedCount / 30) * 100, 100);
+  var pct = Math.min((watchedCount / 40) * 100, 100);
 
   if (bar) bar.style.width = pct + '%';
 
   if (watchedCount < 30) {
-    if (counter) counter.textContent = watchedCount + ' / 30';
-  } else if (watchedCount === 30) {
+    if (counter) counter.textContent = watchedCount + ' / 40';
+  } else if (watchedCount === 40) {
     // Show the continue modal
     if (bar) { bar.classList.add('ready'); bar.classList.add('shimmer'); }
     showContinueModal();
@@ -1226,7 +1287,7 @@ function continueScrolling() {
 }
 
 function handleCounterClick() {
-  if (watchedCount >= 30) endSession();
+  if (watchedCount >= 40) endSession();
 }
 
 function endSession() {
@@ -1350,16 +1411,37 @@ function buildReflection() {
   document.getElementById('r-most-liked').textContent = mostLikedInfo ? (mostLikedInfo.emoji + ' ' + mostLikedInfo.label + ' (' + mostLikedN + ' likes)') : 'None';
   document.getElementById('r-most-carted').textContent = mostCartedInfo ? (mostCartedInfo.emoji + ' ' + mostCartedInfo.label + ' (' + mostCartedN + ' items)') : 'None';
 
+  // Determine if liked/carted category matches survey choice
+  var isSameCat = (mostLikedCat && mostLikedCat === surveyCat);
+  var catLabel = surveyInfo ? surveyInfo.label : 'this category';
+  var catEmoji = surveyInfo ? surveyInfo.emoji : '';
+
   var divergeText = '';
-  if (mostLikedCat && mostLikedCat !== surveyCat) {
+  if (isSameCat) {
+    divergeText = 'You came for ' + catEmoji + ' ' + catLabel + '. You stayed for ' + catEmoji + ' ' + catLabel + '. But how much of what ended up in your cart was a decision — and how much was just momentum?';
+  } else if (mostLikedCat && mostLikedCat !== surveyCat) {
     var likedPct = Math.round((likeCounts[mostLikedCat] / Math.max(Object.values(likeCounts).reduce(function(a,b){return a+b;},0),1)) * 100);
     divergeText = 'You came for ' + surveyInfo.label + '. But ' + likedPct + '% of your engagement went to ' + mostLikedInfo.label + ' — a category you didn\'t mention wanting. The algorithm noticed before you did.';
-  } else if (mostLikedCat && mostLikedCat === surveyCat) {
-    divergeText = 'Your feed stayed close to what you said you wanted. But notice how fast it narrowed — after just a few likes, ' + surveyInfo.label + ' content crowded everything else out.';
   } else {
     divergeText = 'You scrolled without liking much — which means the algorithm had less to work with. That restraint is itself a form of awareness.';
   }
   document.getElementById('r-diverge-text').textContent = divergeText;
+
+  // Update algo-statement copy based on same vs different category
+  var algoEl = document.getElementById('algo-statement');
+  if (algoEl) {
+    if (isSameCat) {
+      algoEl.innerHTML =
+        '<p>You said you were interested in <strong>' + catEmoji + ' ' + catLabel + '</strong> before you started. And your feed delivered exactly that.</p>' +
+        '<p>But here\'s what\'s worth noticing: you didn\'t just browse ' + catLabel + ' — you bought into it. The algorithm didn\'t change your mind. It didn\'t need to. It simply kept showing you more of what you already wanted, until wanting became buying.</p>' +
+        '<p>That\'s a subtler kind of influence. Not manipulation — <strong>amplification.</strong> The algorithm found your signal and turned up the volume. Whether the desire was already yours, or the algorithm grew it — <strong>that line is harder to find than it looks.</strong></p>';
+    } else {
+      algoEl.innerHTML =
+        '<p>The algorithm didn\'t push ads at you. It did something subtler — it watched what you paused on, what you liked, what you almost scrolled past but didn\'t.</p>' +
+        '<p>Then it quietly rebuilt your feed around those signals. <strong>You didn\'t decide to want these things.</strong> You were shown them — repeatedly, at the right moment, in the right format — until wanting felt natural.</p>' +
+        '<p>That\'s not a glitch. <strong>That\'s the design.</strong></p>';
+    }
+  }
 
   // Like distribution chart
   var totalLikes = 0;
@@ -1440,7 +1522,9 @@ function buildReflection() {
     }
   }
   var titleEl = document.getElementById('reflect-title');
-  if (mostLikedCat && mostLikedCat !== surveyCat) {
+  if (isSameCat) {
+    titleEl.textContent = 'Your feed confirmed exactly what you told it.';
+  } else if (mostLikedCat && mostLikedCat !== surveyCat) {
     titleEl.textContent = 'You came for ' + (surveyInfo ? surveyInfo.label : 'one thing') + '. The algorithm had other plans.';
   } else if (cartItems.length > 0) {
     titleEl.textContent = 'You said you came for ' + (surveyInfo ? surveyInfo.label : 'one thing') + '. Your cart tells a different story.';
@@ -1478,7 +1562,7 @@ function startFeed() {
   var bar = document.getElementById('feed-progress-bar');
   if (bar) { bar.style.width = '0%'; bar.classList.remove('ready','shimmer'); }
   var counter = document.getElementById('feed-counter');
-  if (counter) { counter.textContent = '0 / 30'; counter.classList.remove('ready'); }
+  if (counter) { counter.textContent = '0 / 40'; counter.classList.remove('ready'); }
   goTo('s-feed');
 }
 
